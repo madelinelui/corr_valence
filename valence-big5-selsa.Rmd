@@ -1,0 +1,377 @@
+---
+title: "valence-big5-selsa"
+author: "Madeline Lui"
+date: "2022-10-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r big5 dat, cache=TRUE}
+library(tidyverse)
+library(reshape2)
+library(corrr)
+library(Hmisc)
+big5 <- read_csv("Big5_raw.csv") %>%
+  select(-`...1`)
+parti_valence <- read_csv("valence_key.csv") %>%
+  select(-...1)
+
+## key_Extraversion <- c(1, -1, 1, 1, -1, 1, -1, 1) (8 items) 
+## key_Agreeableness <- c(-1, 1, -1, 1, 1, -1, 1, -1, 1) (9 items) 
+## key_Conscientiousness <- c(1, -1, 1, -1, -1, 1, 1, 1, -1) (9 items) 
+## key_Neurotcism <- c(1, -1, 1, 1, -1, 1, -1, 1) (8 items) 
+## key_Openness <- c(1, 1, 1, 1, 1, 1, -1, 1, -1, 1) (10 items)
+
+
+scale_name <- c('O','C', 'E', 'A', 'N')
+rev_scored <- list(c(7, 9), c(2, 4, 5, 9), c(2, 5, 7), c(1, 3, 6, 8), c(2, 5, 7))
+
+parti_pos <- filter(parti_valence, condition=="positive")
+parti_pos_big <- subset(big5, P_ID %in% parti_pos$P_ID)
+parti_neg <- filter(parti_valence, condition=="negative")
+parti_neg_big <- subset(big5, P_ID %in% parti_neg$P_ID)
+
+#positive
+for (i in 1:5) {
+  print(scale_name[i])
+  assign(paste0('Pos_',scale_name[i]),
+         parti_pos_big %>%
+           select(P_ID, contains(scale_name[i])) %>%
+           pivot_longer(-P_ID) %>%
+           rename(item = name, score = value) %>%
+           separate(item, into = c("scale", "item"), -1) %>%
+           mutate(valence = ifelse(item %in% rev_scored[[i]],
+                                   paste0('neg_', scale_name[i]), paste0('pos_', scale_name[i]))) %>%
+           group_by(P_ID, valence) %>%
+           summarise(mean = mean(score)) %>%
+           pivot_wider(names_from=valence, values_from = mean)
+           
+  )
+}
+
+#negative
+for (i in 1:5) {
+  print(scale_name[i])
+  assign(paste0('Neg_',scale_name[i]), 
+         parti_neg_big %>%
+           select(P_ID, contains(scale_name[i])) %>%
+           pivot_longer(-P_ID) %>%
+           rename(item = name, score = value) %>%
+           separate(item, into = c("scale", "item"), -1) %>%
+           mutate(valence = ifelse(item %in% rev_scored[[i]],
+                                   paste0('neg_', scale_name[i]), paste0('pos_', scale_name[i]))) %>%
+           group_by(P_ID, valence) %>%
+           summarise(mean = mean(score)) %>%
+           pivot_wider(names_from=valence, values_from = mean)
+
+  )
+}
+
+
+big_data_P = Pos_O %>%
+  inner_join(Pos_C) %>%
+  inner_join(Pos_E) %>%
+  inner_join(Pos_A) %>%
+  inner_join(Pos_N)%>%
+  round(2) %>%
+  select(P_ID, neg_O, neg_C, neg_E, neg_A, neg_N, pos_O, pos_C, pos_E, pos_A, pos_N)
+  
+pos_cor <- cor(big_data_P) %>% round(2)
+  
+big_data_N = Neg_O %>%
+  inner_join(Neg_C) %>%
+  inner_join(Neg_E) %>%
+  inner_join(Neg_A) %>%
+  inner_join(Neg_N) %>%
+  round(2) %>%
+  select(P_ID, neg_O, neg_C, neg_E, neg_A, neg_N, pos_O, pos_C, pos_E, pos_A, pos_N)
+
+neg_cor <- cor(big_data_N) %>% round(2)
+
+big_data_all <- rbind(big_data_N, big_data_P)
+cor_all <- cor(big_data_all) %>% round(2)
+```
+```{r selsa dat, cache=TRUE}
+#  c(1, -1, -1, 1, -1, -1, 1, -1, -1, 1, -1, -1, 1, -1, 1) 
+selsa <- read_csv("SELSA_raw.csv") %>%
+  rename(P_ID = ...1)
+
+rev_score_selsa <- list(c("soc_1", "rom_1", "soc_2", "rom_2", "fam_3", "soc_4", "fam_4", "fam_5", "rom_4"))
+
+selsa_means <- selsa %>%
+  pivot_longer(cols = -P_ID) %>%
+  rename(score=value) %>%
+  separate(name, into = c("scale", "item"), -5) %>%
+  mutate(valence = ifelse(item %in% rev_score_selsa[[1]], "neg_selsa", "pos_selsa")) %>%
+  group_by(P_ID, valence) %>%
+  summarise(mean_selsa = mean(score)) %>%
+  pivot_wider(names_from = valence, values_from = mean_selsa) %>%
+  round(2)
+
+
+pos_dat <- inner_join(big_data_P, selsa_means, by = "P_ID") %>%
+  ungroup() %>% select(-P_ID)
+
+pos_cor = cor(pos_dat) %>% round(2)
+
+neg_dat <- inner_join(big_data_N, selsa_means, by= "P_ID") %>%
+  ungroup() %>% select(-P_ID)
+
+neg_cor = cor(neg_dat) %>% round(2)
+
+cor_dat <- rbind(pos_dat, neg_dat)
+
+overall_cor <- cor(cor_dat) %>% round(2)
+
+#library(magrittr)
+rcorr(as.matrix(cor_dat), type="pearson") 
+```
+
+```{r forest plots, cache=TRUE}
+bigselsa_df <- tibble(trait = c('O','O','O','C','C','C','E','E','E', 'A', 'A', 'A', 'N', 'N', 'N','SELSA', 'SELSA','SELSA'),
+               condition = c('neg', 'pos', 'all',
+                                'neg', 'pos', 'all',
+                                'neg', 'pos', 'all',
+                                'neg', 'pos', 'all',
+                                'neg', 'pos', 'all',
+                                'neg', 'pos', 'all'),
+               correlation = c(-0.34, -0.39, -0.36,
+                                  -0.57, -0.61, -0.59,
+                                  -0.64, -0.7, -0.67,
+                                  -0.57, -0.51, -0.54,
+                                  -0.68, -0.69, -0.68,
+                                  -0.76, -0.72, -0.7763),
+               CI_lower = c(-0.4404, -0.4864, -0.4298,
+                            -0.6467, -0.6814, -0.6423,
+                            -0.707, -0.758, -0.7142,
+                            -0.6467, -0.5941, -0.5968,
+                            -0.741, -0.7496, -0.7231,
+                            -0.808, -0.7748, -0.7763),
+               CI_upper = c(-0.2396, -0.2936, -0.2902,
+                            -0.4933, -0.5386, -0.5377,
+                            -0.573, -0.642, -0.6258,
+                            -0.4933, -0.4259, -0.4832,
+                            -0.619, -0.6304, -0.6369,
+                            -0.712, -0.6652, -0.7037))
+
+ggplot(bigselsa_df, aes(y=trait, x=correlation,
+                 xmin = CI_lower,
+                 xmax = CI_upper))+
+  geom_point()+
+  geom_errorbarh(height=.3, aes(colour=condition))+
+  geom_vline(xintercept=c(0,0), linetype="dotted")+
+  labs(x="Correlation", y="Factor") +
+  xlim(-1, 0.1) +
+  theme_classic()
+  
+
+```
+```{r plots negative condition big5xselsa, cache=TRUE}
+
+# corr between B5 N and SELSA:
+## B5_N neg + SELSA neg
+## B5_N neg + SELSA pos
+## B5_N pos + SELSA neg
+## B5_N pos + SELSA pos
+
+#neg valence condition
+##Openness
+o_selsa_neg <- tibble(factors = c("O-SELSA-", "O-SELSA+", "O+SELSA-", "O+SELSA+"),
+                      group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
+       correlation = c(-0.05, 0.05, 0.06, -0.03),
+       CI_lower = c(-0.1633, -0.0633, -0.0531, -0.1434),
+       CI_upper = c(0.0633, 0.1633, 0.1731, 0.0834))
+
+oselsaneg_p <- ggplot(o_selsa_neg, aes(y=factors, x=correlation,
+                 xmin = CI_lower,
+                 xmax = CI_upper))+
+  geom_point(show.legend = FALSE)+
+  geom_errorbarh(height=.5, show.legend = FALSE)+
+  geom_vline(xintercept=c(0,0), linetype="dotted") +
+  labs(x="Correlation", y="Valence", title = "Openness") +
+  xlim(-0.8, 0.8) +
+  theme_classic()
+
+#Conscientiousness
+c_selsa_neg <- tibble(factors = c("C-SELSA-", "C-SELSA+", "C+SELSA-", "C+SELSA+"),
+                      group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
+       correlation = c(-0.14, 0.21, 0.21, -0.24),
+       CI_lower = c(-0.2513, 0.1015, 0.1015, -0.347),
+       CI_upper = c(-0.0287, 0.3185, 0.3185, -0.133))
+
+cselsaneg_p <- ggplot(c_selsa_neg, aes(y=factors, x=correlation,
+                 xmin = CI_lower,
+                 xmax = CI_upper))+
+  geom_point(show.legend = FALSE)+
+  geom_errorbarh(height=.5, show.legend = FALSE)+
+  geom_vline(xintercept=c(0,0), linetype="dotted") +
+  labs(x="Correlation", y="Valence", title = "Conscientiousness") +
+  xlim(-0.8, 0.8) +
+  theme_classic()
+
+#Extraversion
+e_selsa_neg <- tibble(factors = c("E-SELSA-", "E-SELSA+", "E+SELSA-", "E+SELSA+"),
+                      group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
+       correlation = c(-0.26, 0.22, 0.42, -0.31),
+       CI_lower = c(-0.3659, 0.112, 0.3265, -0.4126),
+       CI_upper = c(-0.1541, 0.328, 0.5135, -0.2074))
+
+eselsaneg_p <- ggplot(e_selsa_neg, aes(y=factors, x=correlation,
+                 xmin = CI_lower,
+                 xmax = CI_upper))+
+  geom_point(show.legend = FALSE)+
+  geom_errorbarh(height=.5, show.legend = FALSE)+
+  geom_vline(xintercept=c(0,0), linetype="dotted") +
+  labs(x="Correlation", y="Valence", title = "Extraversion") +
+  xlim(-0.8, 0.8) +
+  theme_classic()
+
+#Agreeableness
+a_selsa_neg <- tibble(factors = c("A-SELSA-", "A-SELSA+", "A+SELSA-", "A+SELSA+"),
+                      group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
+       correlation = c(-0.24, 0.28, 0.37, -0.31),
+       CI_lower = c(-0.347, 0.1754, 0.272, -0.4126),
+       CI_upper = c(-0.133, 0.3846, 0.468, -0.2074))
+
+aselsaneg_p <- ggplot(a_selsa_neg, aes(y=factors, x=correlation,
+                 xmin = CI_lower,
+                 xmax = CI_upper))+
+  geom_point(show.legend = FALSE)+
+  geom_errorbarh(height=.5, show.legend = FALSE)+
+  geom_vline(xintercept=c(0,0), linetype="dotted") +
+  labs(x="Correlation", y="Valence", title = "Agreeableness") +
+  xlim(-0.5, 0.5) +
+  theme_classic()
+
+#Neuroticism
+n_selsa_neg <- tibble(factors = c("N-SELSA-", "N-SELSA+", "N+SELSA-", "N+SELSA+"),
+                      group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
+       correlation = c(0.36, -0.38, -0.37, 0.46),
+       CI_lower = c(0.2612, -0.4771, -0.468, 0.3705),
+       CI_upper = c(0.4588, -0.2829, -0.272, 0.5495))
+
+nselsaneg_p <- ggplot(n_selsa_neg, aes(y=factors, x=correlation,
+                 xmin = CI_lower,
+                 xmax = CI_upper))+
+  geom_point(show.legend = FALSE)+
+  geom_errorbarh(height=.5, show.legend = FALSE)+
+  labs(x="Correlation", y="Valence", title = "Neuroticism ") +
+  geom_vline(xintercept=c(0,0), linetype="dotted") +
+  xlim(-0.8, 0.8) +
+  theme_classic()
+
+library(patchwork)
+(oselsaneg_p /
+  cselsaneg_p /
+eselsaneg_p /
+  aselsaneg_p /
+  nselsaneg_p)
+```
+
+
+```{r selsaxbig5 table all, cache=TRUE}
+o_all_bigselsa <- tibble(Valence = c("O-S-", "O-S+", "O+S-", "O+S+"),
+                         group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
+                        Correlation = c(-0.07, 0.08, 0.04, -0.01),
+                        CI_lower = c(-0.1498, 0.0004, -0.04, -0.0901),
+                        CI_upper = c(0.0098, 0.1596, 0.12, 0.0701))
+
+c_all_bigselsa <- tibble(
+                        Valence = c("C-S-", "C-S+", "C+S-", "C+S+"),
+                        group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
+                        Correlation = c(-0.14, 0.18, 0.18, -0.2),
+                        CI_lower = c(-0.2186, 0.1024, 0.1024, -0.2769),
+                        CI_upper = c(-0.0614, 0.2576, 0.2576, -0.1231))
+
+e_all_bigselsa <- tibble(
+                        Valence = c("E-S-", "E-S+", "E+S-", "E+S+"),
+                        group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
+                        Correlation = c(-0.26, 0.23, 0.37, -0.27),
+                        CI_lower = c(-0.3347, 0.1541, 0.3008, -0.3443),
+                        CI_upper = c(-0.1853, 0.3059, 0.4392, -0.1957))
+
+a_all_bigselsa <- tibble(
+                        Valence = c("A-S-", "A-S+", "A+S-", "A+S+"),
+                        group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
+                        Correlation = c(-0.22, 0.25, 0.32, -0.26),
+                        CI_lower = c(-0.2963, 0.1749, 0.2481, -0.3347),
+                        CI_upper = c(-0.1437, 0.3251, 0.3919, -0.1853))
+
+n_all_bigselsa <- tibble(Valence = c("N-S-", "N-S+", "N+S-", "N+S+"),
+                         group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
+                        Correlation = c(0.33, -0.31, -0.37, 0.41),
+                        CI_lower = c(0.2586, -0.3824, -0.4392, 0.3433),
+                        CI_upper = c(0.4014, -0.2376, -0.3008, 0.4767))
+
+```
+```{r bigxselsa plot, cache=TRUE}
+o_all_plot <- ggplot(o_all_bigselsa, aes(x=Correlation, y=Valence,
+                          xmin = CI_lower, xmax = CI_upper))+
+  geom_errorbarh(height= .6, show.legend=FALSE, colour="goldenrod")+
+  geom_point(aes(shape=group), show.legend=FALSE)+
+  geom_vline(xintercept=c(0,0), linetype = "dotted")+
+  xlim(-.8, .8) +
+  labs(title="Openness")+
+  theme_classic()+
+  theme(axis.title.x=element_blank(),
+        axis.title.y=element_blank())
+
+c_all_plot <- ggplot(c_all_bigselsa, aes(x=Correlation, y=Valence,
+                          xmin = CI_lower, xmax = CI_upper))+
+  geom_errorbarh(height= .6, show.legend=FALSE, colour="olivedrab")+
+  geom_point(aes(shape=group), show.legend=FALSE)+
+  geom_vline(xintercept=c(0,0), linetype = "dotted")+
+  xlim(-.8, .8) +
+  labs(title="Conscientiousness")+
+  theme_classic()+
+  theme(axis.title.x=element_blank(),
+        axis.title.y=element_blank())
+
+e_all_plot <- ggplot(e_all_bigselsa, aes(x=Correlation, y=Valence,
+                          xmin = CI_lower, xmax = CI_upper))+
+  geom_errorbarh(height= .6, show.legend=FALSE, colour="tomato")+
+  geom_point(aes(shape=group))+
+  geom_vline(xintercept=c(0,0), linetype = "dotted")+
+  xlim(-.8, .8) +
+  labs(title="Extraversion")+
+  theme_classic()+
+  theme(axis.title.x=element_blank())
+
+a_all_plot <- ggplot(a_all_bigselsa, aes(x=Correlation, y=Valence,
+                          xmin = CI_lower, xmax = CI_upper))+
+  geom_errorbarh(height= .6, show.legend=FALSE, colour="violetred")+
+  geom_point(aes(shape=group), show.legend=FALSE)+
+  geom_vline(xintercept=c(0,0), linetype = "dotted")+
+  xlim(-.8, .8) +
+  labs(title="Agreeableness")+
+  theme_classic()+
+  theme(axis.title.x=element_blank(),
+        axis.title.y=element_blank())
+
+n_all_plot <- ggplot(n_all_bigselsa, aes(x=Correlation, y=Valence,
+                          xmin = CI_lower, xmax = CI_upper))+
+  geom_errorbarh(height= .6, show.legend=FALSE, colour = "darkblue")+
+  geom_point(aes(shape=group), show.legend=FALSE)+
+  geom_vline(xintercept=c(0,0), linetype = "dotted")+
+  xlim(-.8, .8) +
+  labs(title="Neuroticism")+
+  theme_classic()+
+  theme(axis.title.y=element_blank())
+
+(o_all_plot /
+    c_all_plot /
+    e_all_plot/
+    a_all_plot/
+    n_all_plot)
+
+```
+
+
+
+
+```{r supprimé, include=FALSE}
+## mutate(new_score = ifelse(item %in% rev_score_selsa[[1]], 8-score, score))
+```
