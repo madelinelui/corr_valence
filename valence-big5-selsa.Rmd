@@ -14,6 +14,7 @@ library(tidyverse)
 library(reshape2)
 library(corrr)
 library(Hmisc)
+library(patchwork)
 big5 <- read_csv("Big5_raw.csv") %>%
   select(-`...1`)
 parti_valence <- read_csv("valence_key.csv") %>%
@@ -169,110 +170,15 @@ ggplot(bigselsa_df, aes(y=trait, x=correlation,
   
 
 ```
-```{r plots negative condition big5xselsa, cache=TRUE}
-
-# corr between B5 N and SELSA:
-## B5_N neg + SELSA neg
-## B5_N neg + SELSA pos
-## B5_N pos + SELSA neg
-## B5_N pos + SELSA pos
-
-#neg valence condition
-##Openness
-o_selsa_neg <- tibble(factors = c("O-SELSA-", "O-SELSA+", "O+SELSA-", "O+SELSA+"),
-                      group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
-       correlation = c(-0.05, 0.05, 0.06, -0.03),
-       CI_lower = c(-0.1633, -0.0633, -0.0531, -0.1434),
-       CI_upper = c(0.0633, 0.1633, 0.1731, 0.0834))
-
-oselsaneg_p <- ggplot(o_selsa_neg, aes(y=factors, x=correlation,
-                 xmin = CI_lower,
-                 xmax = CI_upper))+
-  geom_point(show.legend = FALSE)+
-  geom_errorbarh(height=.5, show.legend = FALSE)+
-  geom_vline(xintercept=c(0,0), linetype="dotted") +
-  labs(x="Correlation", y="Valence", title = "Openness") +
-  xlim(-0.8, 0.8) +
-  theme_classic()
-
-#Conscientiousness
-c_selsa_neg <- tibble(factors = c("C-SELSA-", "C-SELSA+", "C+SELSA-", "C+SELSA+"),
-                      group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
-       correlation = c(-0.14, 0.21, 0.21, -0.24),
-       CI_lower = c(-0.2513, 0.1015, 0.1015, -0.347),
-       CI_upper = c(-0.0287, 0.3185, 0.3185, -0.133))
-
-cselsaneg_p <- ggplot(c_selsa_neg, aes(y=factors, x=correlation,
-                 xmin = CI_lower,
-                 xmax = CI_upper))+
-  geom_point(show.legend = FALSE)+
-  geom_errorbarh(height=.5, show.legend = FALSE)+
-  geom_vline(xintercept=c(0,0), linetype="dotted") +
-  labs(x="Correlation", y="Valence", title = "Conscientiousness") +
-  xlim(-0.8, 0.8) +
-  theme_classic()
-
-#Extraversion
-e_selsa_neg <- tibble(factors = c("E-SELSA-", "E-SELSA+", "E+SELSA-", "E+SELSA+"),
-                      group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
-       correlation = c(-0.26, 0.22, 0.42, -0.31),
-       CI_lower = c(-0.3659, 0.112, 0.3265, -0.4126),
-       CI_upper = c(-0.1541, 0.328, 0.5135, -0.2074))
-
-eselsaneg_p <- ggplot(e_selsa_neg, aes(y=factors, x=correlation,
-                 xmin = CI_lower,
-                 xmax = CI_upper))+
-  geom_point(show.legend = FALSE)+
-  geom_errorbarh(height=.5, show.legend = FALSE)+
-  geom_vline(xintercept=c(0,0), linetype="dotted") +
-  labs(x="Correlation", y="Valence", title = "Extraversion") +
-  xlim(-0.8, 0.8) +
-  theme_classic()
-
-#Agreeableness
-a_selsa_neg <- tibble(factors = c("A-SELSA-", "A-SELSA+", "A+SELSA-", "A+SELSA+"),
-                      group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
-       correlation = c(-0.24, 0.28, 0.37, -0.31),
-       CI_lower = c(-0.347, 0.1754, 0.272, -0.4126),
-       CI_upper = c(-0.133, 0.3846, 0.468, -0.2074))
-
-aselsaneg_p <- ggplot(a_selsa_neg, aes(y=factors, x=correlation,
-                 xmin = CI_lower,
-                 xmax = CI_upper))+
-  geom_point(show.legend = FALSE)+
-  geom_errorbarh(height=.5, show.legend = FALSE)+
-  geom_vline(xintercept=c(0,0), linetype="dotted") +
-  labs(x="Correlation", y="Valence", title = "Agreeableness") +
-  xlim(-0.5, 0.5) +
-  theme_classic()
-
-#Neuroticism
-n_selsa_neg <- tibble(factors = c("N-SELSA-", "N-SELSA+", "N+SELSA-", "N+SELSA+"),
-                      group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
-       correlation = c(0.36, -0.38, -0.37, 0.46),
-       CI_lower = c(0.2612, -0.4771, -0.468, 0.3705),
-       CI_upper = c(0.4588, -0.2829, -0.272, 0.5495))
-
-nselsaneg_p <- ggplot(n_selsa_neg, aes(y=factors, x=correlation,
-                 xmin = CI_lower,
-                 xmax = CI_upper))+
-  geom_point(show.legend = FALSE)+
-  geom_errorbarh(height=.5, show.legend = FALSE)+
-  labs(x="Correlation", y="Valence", title = "Neuroticism ") +
-  geom_vline(xintercept=c(0,0), linetype="dotted") +
-  xlim(-0.8, 0.8) +
-  theme_classic()
-
-library(patchwork)
-(oselsaneg_p /
-  cselsaneg_p /
-eselsaneg_p /
-  aselsaneg_p /
-  nselsaneg_p)
-```
-
 
 ```{r selsaxbig5 table all, cache=TRUE}
+
+# corr between B5 and SELSA:
+## B5 neg + SELSA neg
+## B5 neg + SELSA pos
+## B5 pos + SELSA neg
+## B5 pos + SELSA pos
+
 o_all_bigselsa <- tibble(Valence = c("O-S-", "O-S+", "O+S-", "O+S+"),
                          group = c("Consistent", "Inconsistent", "Inconsistent", "Consistent"),
                         Correlation = c(-0.07, 0.08, 0.04, -0.01),
@@ -368,8 +274,6 @@ n_all_plot <- ggplot(n_all_bigselsa, aes(x=Correlation, y=Valence,
     n_all_plot)
 
 ```
-
-
 
 
 ```{r supprimé, include=FALSE}
